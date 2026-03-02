@@ -1,8 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../assets/musicco_logo.svg";
 import uploadIcon from "../assets/upload.png";
 import "./UploadPage.css";
+import { socket } from "../socket";
 
 const MOCK_SONGS = [
     { id: 1, title: "Tum Hi Ho", artist: "Arijit Singh, Mithoon" },
@@ -25,6 +26,50 @@ const UploadPage = () => {
     const [roomCode, setRoomCode] = useState<string[]>(new Array(10).fill(""));
     const fileInputRef = useRef<HTMLInputElement>(null);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    useEffect(() => {
+        //? Listen for create room success
+        socket.on("success:create-room", ({ roomId }) => {
+            console.log("Room created successfully:", roomId);
+            navigate(`/party/${roomId}`);
+        });
+
+        //? Listen for join room success
+        socket.on("success:join-room", ({ roomId }) => {
+            console.log("Joined room successfully:", roomId);
+            navigate(`/party/${roomId}`);
+        });
+
+        //? Listen for errors
+        socket.on("error:create-room", (error) => {
+            alert(error);
+        });
+
+        socket.on("error:join-room", (error) => {
+            alert(error);
+        });
+
+        return () => {
+            socket.off("success:create-room");
+            socket.off("success:join-room");
+            socket.off("error:create-room");
+            socket.off("error:join-room");
+        };
+    }, [navigate]);
+
+    const handleCreateRoom = () => {
+        socket.emit("create-room");
+    };
+
+    const handleJoinRoom = () => {
+        const fullCode = roomCode.join("");
+        if (fullCode.length === 10) {
+            const formattedCode = `${fullCode.slice(0, 4)}-${fullCode.slice(4, 7)}-${fullCode.slice(7, 10)}`;
+            socket.emit("join-room", { roomId: formattedCode });
+        } else {
+            alert("Please enter a valid 10-character room code.");
+        }
+    };
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(e.target.value);
@@ -250,7 +295,7 @@ const UploadPage = () => {
                 <p className="footer-hint"><span className="asterisk">*</span>Host can also select or upload songs after room is created</p>
 
                 <div className="footer-actions">
-                    <button className="create-room-btn action-btn" onClick={() => navigate("/party")}>Create Room</button>
+                    <button className="create-room-btn action-btn" onClick={handleCreateRoom}>Create Room</button>
                     <span className="action-or">OR</span>
                     <button className="join-room-btn action-btn" onClick={() => setShowJoinModal(true)}>Join Room</button>
                 </div>
@@ -315,10 +360,7 @@ const UploadPage = () => {
                         </div>
                         <div className="modal-actions">
                             <button className="cancel-btn" onClick={() => setShowJoinModal(false)}>Cancel</button>
-                            <button className="submit-join-btn" onClick={() => {
-                                navigate("/party");
-                                setShowJoinModal(false);
-                            }}>Join</button>
+                            <button className="submit-join-btn" onClick={handleJoinRoom}>Join</button>
                         </div>
                     </div>
                 </div>

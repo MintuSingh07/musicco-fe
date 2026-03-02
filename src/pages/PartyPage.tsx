@@ -1,38 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/musicco_logo.svg';
 import laptopIcon from '../assets/laptop.svg';
-import laptop2Icon from '../assets/laptop-2.png';
 import mobileIcon from '../assets/mobile.svg';
 import tabletIcon from '../assets/tablet.svg';
 import './PartyPage.css';
+import { socket } from '../socket';
 
 interface Member {
-    id: number;
-    type: 'Mobile' | 'Tablet' | 'Laptop';
-    name: string;
-    icon: string;
-    deviceName: string;
+    id: string;
+    device_type: 'Mobile' | 'Tablet' | 'Laptop';
+    device_name: string;
+    icon?: string; // Optional since we'll map inside the component or keep from server if sent
 }
 
 const PartyPage = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [members, setMembers] = useState<Member[]>([]);
+    const [adminId, setAdminId] = useState<string>('');
     const [mode, setMode] = useState<'traverse' | 'boom'>('traverse');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
 
-    const members: Member[] = [
-        { id: 2, type: 'Mobile', name: 'iPhone 13 Pro', icon: mobileIcon, deviceName: 'iPhone 13 Pro' },
-        { id: 3, type: 'Tablet', name: 'iPad Gen3', icon: tabletIcon, deviceName: 'iPad Gen3' },
-        { id: 4, type: 'Mobile', name: 'Vivo 23 Ultra', icon: mobileIcon, deviceName: 'Vivo 23 Ultra' },
-        { id: 5, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
-        { id: 6, type: 'Laptop', name: 'HP Victus', icon: laptop2Icon, deviceName: 'HP Victus' },
-        { id: 7, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
-        { id: 8, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
-        { id: 9, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
-        { id: 10, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
-    ];
+    useEffect(() => {
+        if (!id) return;
+
+        //? Join room on mount (handles direct links)
+        socket.emit('join-room', { roomId: id });
+
+        //? Listen for initial room data and join success
+        socket.on("success:join-room", ({ roomId, members: initialMembers, admin: currentAdminId }) => {
+            if (roomId === id) {
+                setAdminId(currentAdminId);
+                const formattedMembers: Member[] = initialMembers.map((m: any) => ({
+                    ...m,
+                    icon: m.device_type === 'Laptop' ? laptopIcon : (m.device_type === 'Tablet' ? tabletIcon : mobileIcon)
+                }));
+                setMembers(formattedMembers);
+            }
+        });
+
+        //? Listen for new users
+        socket.on("user-joined", (newMember: any) => {
+            setMembers(prev => {
+                if (prev.some(m => m.id === newMember.id)) return prev;
+                return [...prev, {
+                    ...newMember,
+                    icon: newMember.device_type === 'Laptop' ? laptopIcon : (newMember.device_type === 'Tablet' ? tabletIcon : mobileIcon)
+                }];
+            });
+        });
+
+        //? Listen for users leaving
+        socket.on("user-left", (leftMemberId) => {
+            setMembers(prev => prev.filter(m => m.id !== leftMemberId));
+        });
+
+        socket.on("error:join-room", (error) => {
+            console.error(error);
+            // If room doesn't exist, we might want to redirect
+        });
+
+        return () => {
+            socket.off("success:join-room");
+            socket.off("user-joined");
+            socket.off("user-left");
+            socket.off("error:join-room");
+        };
+    }, [id]);
 
     const handleCopy = () => {
         const url = window.location.href;
@@ -77,15 +113,28 @@ const PartyPage = () => {
             <main className="party-main">
                 <section className="host-section">
                     <div className="host-device-info">
-                        <div className="host-device-type">Laptop</div>
-                        <div className="host-device-name">HP TUF</div>
+                        <div className="host-device-type">
+                            {members.find(m => m.id === adminId)?.device_type || 'Laptop'}
+                        </div>
+                        <div className="host-device-name">
+                            {members.find(m => m.id === adminId)?.device_name || 'Primary Device'}
+                        </div>
                     </div>
 
                     <div className="host-icon-wrapper">
-                        <img src={laptopIcon} alt="Host Device" className="host-laptop-icon" />
+                        <img
+                            src={
+                                members.find(m => m.id === adminId)?.device_type === 'Mobile' ? mobileIcon :
+                                    (members.find(m => m.id === adminId)?.device_type === 'Tablet' ? tabletIcon : laptopIcon)
+                            }
+                            alt="Host Device"
+                            className="host-laptop-icon"
+                        />
                     </div>
 
-                    <div className="host-display-name">Host: @User649JwK</div>
+                    <div className="host-display-name">
+                        Host: {adminId === socket.id ? "Your Device" : `@User_${adminId.substring(0, 5)}`}
+                    </div>
 
                     <div className="mode-toggle-wrapper">
                         <div className={`toggle-container ${mode}`}>
@@ -111,13 +160,13 @@ const PartyPage = () => {
                     <p className="members-count-info">Min. 2 devices, Max. 8 devices</p>
 
                     <div className="members-grid">
-                        {members.map((member) => (
+                        {members.filter(m => m.id !== adminId).map((member, index) => (
                             <div key={member.id} className="member-card">
-                                <span className="member-number">{member.id}</span>
-                                <img src={member.icon} alt={member.type} className={`member-icon ${member.type.toLowerCase()}`} />
+                                <span className="member-number">{index + 1}</span>
+                                <img src={member.icon} alt={member.device_type} className={`member-icon ${member.device_type.toLowerCase()}`} />
                                 <div className="member-info">
-                                    <span className="member-device-type">{member.type}</span>
-                                    <span className="member-device-name">{member.deviceName}</span>
+                                    <span className="member-device-type">{member.device_type}</span>
+                                    <span className="member-device-name">{member.device_name}</span>
                                 </div>
                             </div>
                         ))}

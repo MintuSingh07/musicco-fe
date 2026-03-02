@@ -1,0 +1,26 @@
+:root {
+  --bg-color: #020202;
+  --text-color: #ffffff;
+  --primary-color: #6113CE;
+  --primary-glow: rgba(97, 19, 206, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Josefin Sans', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}

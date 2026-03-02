@@ -1,0 +1,426 @@
+.party-container {
+  min-height: 100vh;
+  background-color: #020202;
+  color: white;
+  padding: 2rem 4rem;
+  position: relative;
+  overflow: hidden;
+  font-family: "Josefin Sans", sans-serif;
+}
+
+/* Ambient Glows */
+.ambient-glow {
+  position: absolute;
+  width: 800px; /* Increased from 600px */
+  height: 800px; /* Increased from 600px */
+  border-radius: 50%;
+  filter: blur(150px); /* Increased from 120px */
+  z-index: 1;
+  opacity: 0.35; /* Increased from 0.15 */
+  pointer-events: none;
+}
+
+.glow-top-left {
+  top: -300px;
+  left: -300px;
+  background: radial-gradient(circle, var(--primary-color) 0%, transparent 70%);
+}
+
+.glow-bottom-right {
+  bottom: -300px;
+  right: -300px;
+  background: radial-gradient(circle, var(--primary-color) 0%, transparent 70%);
+}
+
+.party-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  z-index: 2;
+  margin-bottom: 2rem;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2rem;
+  width: 100%;
+}
+
+.logo {
+  height: 24px;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.logo:hover {
+  opacity: 0.8;
+}
+
+.room-info-header {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  cursor: pointer;
+}
+
+.back-icon {
+  font-size: 1.5rem;
+  color: white;
+}
+
+.room-info-title {
+  font-size: 2.4rem; /* Adjusted to sweet spot */
+  font-weight: 500;
+  margin: 0;
+}
+
+.room-code-section {
+  margin-top: 0.8rem;
+  padding-left: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.room-code-label {
+  color: #888;
+  font-size: 1.25rem; /* Adjusted to sweet spot */
+}
+
+.room-code-value {
+  color: white;
+  font-size: 1.25rem; /* Adjusted to sweet spot */
+  margin-left: 0.5rem;
+}
+
+.share-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.share-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+/* Host Section */
+.party-main {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 2rem;
+}
+
+.host-section {
+  text-align: center;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.host-device-info {
+  margin-bottom: 1rem;
+}
+
+.host-device-type {
+  font-size: 1.6rem; /* Adjusted to sweet spot */
+  font-weight: 500;
+  margin-bottom: 0.2rem;
+}
+
+.host-device-name {
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.host-icon-wrapper {
+  margin-bottom: 1.5rem;
+}
+
+.host-laptop-icon {
+  width: 260px; /* Adjusted to sweet spot */
+  height: auto;
+}
+
+.host-display-name {
+  font-size: 1.6rem; /* Adjusted to sweet spot */
+  font-weight: 400;
+  color: white;
+}
+
+/* Toggle Switch */
+.mode-toggle-wrapper {
+  margin-top: 1.5rem;
+}
+
+.toggle-container {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 30px;
+  padding: 4px;
+  display: flex;
+  position: relative;
+  width: 140px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 25px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-container.boom .toggle-slider {
+  transform: translateX(100%);
+}
+
+.toggle-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #666;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.3s ease;
+}
+
+.toggle-btn.active {
+  color: white;
+}
+
+/* Other Members */
+.members-section {
+  width: 100%;
+  margin-top: 4rem;
+  position: relative;
+  z-index: 2;
+}
+
+.members-title {
+  font-size: 2.4rem; /* Adjusted to sweet spot */
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.members-count-info {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 2.5rem;
+}
+
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2rem;
+  padding-bottom: 2rem;
+}
+
+.member-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.member-number {
+  font-size: 1.1rem;
+  color: white;
+  opacity: 0.8;
+}
+
+.member-icon {
+  width: 48px; /* Adjusted to sweet spot */
+  height: auto;
+  opacity: 0.9;
+  object-fit: contain;
+}
+
+.member-icon.mobile {
+  width: 20px; /* Adjusted to sweet spot */
+}
+
+.member-icon.tablet {
+  width: 28px; /* Adjusted to sweet spot */
+}
+
+.member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.member-device-type {
+  font-size: 1.25rem; /* Adjusted to sweet spot */
+  font-weight: 500;
+}
+
+.member-device-name {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.host-section,
+.members-section {
+  animation: fadeIn 0.8s ease-out both;
+}
+
+.members-section {
+  animation-delay: 0.2s;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .party-container {
+    padding: 1.5rem;
+  }
+
+  .ambient-glow {
+    width: 600px;
+    height: 600px;
+    filter: blur(100px);
+    opacity: 0.3;
+  }
+
+  .glow-top-left {
+    top: -200px;
+    left: -200px;
+  }
+
+  .glow-bottom-right {
+    bottom: -200px;
+    right: -200px;
+  }
+
+  .room-info-title {
+    font-size: 1.6rem; /* Preserve mobile size */
+  }
+
+  .room-code-label,
+  .room-code-value {
+    font-size: 1.1rem; /* Preserve mobile size */
+  }
+
+  .host-device-type {
+    font-size: 1.4rem; /* Preserve mobile size */
+  }
+
+  .host-display-name {
+    font-size: 1.2rem; /* Preserve mobile size */
+  }
+
+  .members-title {
+    font-size: 1.6rem; /* Preserve mobile size */
+  }
+
+  .member-device-type {
+    font-size: 1.1rem; /* Preserve mobile size */
+  }
+
+  .members-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .host-laptop-icon {
+    width: 180px; /* Preserve mobile size */
+  }
+
+  .member-icon {
+    width: 35px; /* Preserve mobile size */
+  }
+
+  .member-icon.mobile {
+    width: 20px; /* Preserve mobile size */
+  }
+
+  .member-icon.tablet {
+    width: 22px; /* Preserve mobile size */
+  }
+
+  .room-code-section {
+    margin-top: 1rem;
+  }
+  .members-section {
+    margin-top: 1rem;
+  }
+  .header-right {
+    scale: 0.8;
+  }
+  .members-count-info {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .members-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 1.2rem;
+  }
+
+  .ambient-glow {
+    width: 500px;
+    height: 500px;
+    filter: blur(80px);
+  }
+
+  .glow-top-left {
+    top: -150px;
+    left: -150px;
+  }
+
+  .glow-bottom-right {
+    bottom: -150px;
+    right: -150px;
+  }
+
+  .room-code-label,
+  .room-code-value {
+    font-size: 0.9rem;
+  }
+  .room-code-section {
+    margin-top: 1rem;
+  }
+  .members-section {
+    margin-top: 1rem;
+    padding-bottom: 3rem;
+  }
+  .header-right {
+    scale: 0.8;
+  }
+}

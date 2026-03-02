@@ -1,7 +1,7 @@
 :root {
   --bg-color: #020202;
   --text-color: #ffffff;
-  --primary-color: #6113CE;
+  --primary-color: #6113ce;
   --primary-glow: rgba(97, 19, 206, 0.3);
 }
 
@@ -9,10 +9,17 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+input {
+  user-select: text;
 }
 
 body {
-  font-family: 'Josefin Sans', sans-serif;
+  font-family: "Josefin Sans", sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
   overflow-x: hidden;

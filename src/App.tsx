@@ -9,7 +9,7 @@ const App = () => {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/upload" element={<UploadPage />} />
-        <Route path="/party" element={<PartyPage />} />
+        <Route path="/party/:id" element={<PartyPage />} />
       </Routes>
     </BrowserRouter>
   );

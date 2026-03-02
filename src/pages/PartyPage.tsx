@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/musicco_logo.svg';
 import laptopIcon from '../assets/laptop.svg';
 import laptop2Icon from '../assets/laptop-2.png';
@@ -16,8 +16,11 @@ interface Member {
 }
 
 const PartyPage = () => {
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [mode, setMode] = useState<'traverse' | 'boom'>('traverse');
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
 
     const members: Member[] = [
         { id: 2, type: 'Mobile', name: 'iPhone 13 Pro', icon: mobileIcon, deviceName: 'iPhone 13 Pro' },
@@ -30,6 +33,14 @@ const PartyPage = () => {
         { id: 9, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
         { id: 10, type: 'Mobile', name: 'Samsung 23 Ultra', icon: mobileIcon, deviceName: 'Samsung 23 Ultra' },
     ];
+
+    const handleCopy = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2000);
+        });
+    };
 
     return (
         <div className="party-container">
@@ -46,11 +57,11 @@ const PartyPage = () => {
                     <div className="room-code-section">
                         <div>
                             <span className="room-code-label">Room Code:</span>
-                            <span className="room-code-value">JWT2-TFS-3J3</span>
+                            <span className="room-code-value">{id}</span>
                         </div>
 
                         <div className="header-right">
-                            <button className="share-btn">
+                            <button className="share-btn" onClick={() => setIsShareModalOpen(true)}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ stroke: 'white' }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
                                     <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
@@ -113,8 +124,31 @@ const PartyPage = () => {
                     </div>
                 </section>
             </main>
+
+            {isShareModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsShareModalOpen(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Share Link</h3>
+                            <button className="close-modal" onClick={() => setIsShareModalOpen(false)}>✕</button>
+                        </div>
+                        <div className="share-input-group">
+                            <input
+                                type="text"
+                                readOnly
+                                value={window.location.href}
+                                className="share-url-input"
+                            />
+                            <button className={`copy-btn ${copySuccess ? 'success' : ''}`} onClick={handleCopy}>
+                                {copySuccess ? 'Copied!' : 'Copy'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default PartyPage;
+

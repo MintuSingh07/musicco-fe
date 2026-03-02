@@ -129,19 +129,34 @@ const PartyPage = () => {
                 <div className="modal-overlay" onClick={() => setIsShareModalOpen(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3>Share Link</h3>
+                            <h3>Invite Friends</h3>
                             <button className="close-modal" onClick={() => setIsShareModalOpen(false)}>✕</button>
                         </div>
-                        <div className="share-input-group">
-                            <input
-                                type="text"
-                                readOnly
-                                value={window.location.href}
-                                className="share-url-input"
-                            />
-                            <button className={`copy-btn ${copySuccess ? 'success' : ''}`} onClick={handleCopy}>
-                                {copySuccess ? 'Copied!' : 'Copy'}
-                            </button>
+
+                        <div className="modal-body">
+                            <p className="share-description">Share this link with your friends to join the party!</p>
+
+                            <div className="share-room-code-display">
+                                <span className="label">Room Code:</span>
+                                <span className="value">{id}</span>
+                            </div>
+
+                            <div className="share-input-group">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={window.location.href}
+                                    className="share-url-input"
+                                />
+                                <button className={`copy-btn ${copySuccess ? 'success' : ''}`} onClick={handleCopy}>
+                                    {copySuccess ? (
+                                        <>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                            <span>Copied</span>
+                                        </>
+                                    ) : 'Copy Link'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

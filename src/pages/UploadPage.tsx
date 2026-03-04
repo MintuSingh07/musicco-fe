@@ -22,15 +22,27 @@ const UploadPage = () => {
     const [selectedSongs, setSelectedSongs] = useState<Set<number>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [roomCode, setRoomCode] = useState<string[]>(new Array(10).fill(""));
     const fileInputRef = useRef<HTMLInputElement>(null);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const pendingSongs = useRef<any[]>([]);
 
     useEffect(() => {
         //? Listen for create room success
         socket.on("success:create-room", ({ roomId }) => {
             console.log("Room created successfully:", roomId);
+
+            // If we have pending songs from an upload, add them to the room
+            if (pendingSongs.current.length > 0) {
+                socket.emit("add-song", {
+                    songs: pendingSongs.current,
+                    roomId: roomId
+                });
+                pendingSongs.current = []; // Clear pending songs
+            }
+
             navigate(`/party/${roomId}`);
         });
 
@@ -42,6 +54,7 @@ const UploadPage = () => {
 
         //? Listen for errors
         socket.on("error:create-room", (error) => {
+            setIsLoading(false);
             alert(error);
         });
 
@@ -57,8 +70,59 @@ const UploadPage = () => {
         };
     }, [navigate]);
 
-    const handleCreateRoom = () => {
-        socket.emit("create-room");
+    const handleCreateRoomAndUploadSongs = async () => {
+        if (uploadedFiles.length === 0 && selectedSongs.size === 0) {
+            alert("Please select or upload at least one song!");
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            // 1. Handle File Uploads
+            if (uploadedFiles.length > 0) {
+                const formData = new FormData();
+                uploadedFiles.forEach((file) => {
+                    formData.append("music", file);
+                });
+
+                const response = await fetch("http://localhost:8000/api/v1/music/upload", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to upload songs");
+                }
+
+                const result = await response.json();
+                if (result.success) {
+                    pendingSongs.current = [...pendingSongs.current, ...result.data];
+                }
+            }
+
+            // 2. Handle Library Songs (Mock for now, but following the pattern)
+            if (selectedSongs.size > 0) {
+                const librarySongs = Array.from(selectedSongs).map(id => {
+                    const song = MOCK_SONGS.find(s => s.id === id);
+                    return {
+                        id: `lib_${id}`,
+                        name: song?.title,
+                        artist: song?.artist,
+                        // Add other required fields if backend expects them
+                    };
+                });
+                pendingSongs.current = [...pendingSongs.current, ...librarySongs];
+            }
+
+            // 3. Create Room
+            socket.emit("create-room");
+
+        } catch (error: any) {
+            console.error("Upload error:", error);
+            alert(error.message || "An error occurred during upload");
+            setIsLoading(false);
+        }
     };
 
     const handleJoinRoom = () => {
@@ -172,6 +236,9 @@ const UploadPage = () => {
         song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         song.artist.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    console.log("Uploaded Files are: ", uploadedFiles);
+
 
     return (
         <div className="upload-container">
@@ -295,7 +362,13 @@ const UploadPage = () => {
                 <p className="footer-hint"><span className="asterisk">*</span>Host can also select or upload songs after room is created</p>
 
                 <div className="footer-actions">
-                    <button className="create-room-btn action-btn" onClick={handleCreateRoom}>Create Room</button>
+                    <button
+                        className="create-room-btn action-btn"
+                        onClick={handleCreateRoomAndUploadSongs}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? "Creating..." : "Create Room"}
+                    </button>
                     <span className="action-or">OR</span>
                     <button className="join-room-btn action-btn" onClick={() => setShowJoinModal(true)}>Join Room</button>
                 </div>
@@ -304,6 +377,13 @@ const UploadPage = () => {
                     <a href="#" className="setup-link">How to setup?</a>
                 </div>
             </footer>
+
+            {isLoading && (
+                <div className="loading-overlay">
+                    <div className="loader"></div>
+                    <p>Uploading & Creating Room...</p>
+                </div>
+            )}
 
             {showJoinModal && (
                 <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>

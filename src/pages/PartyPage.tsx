@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/musicco_logo.svg';
-import laptopIcon from '../assets/laptop.svg';
-import mobileIcon from '../assets/mobile.svg';
-import tabletIcon from '../assets/tablet.svg';
+import { HiOutlineDevicePhoneMobile } from "react-icons/hi2";
+import { BsTablet } from "react-icons/bs";
+import { HiOutlineComputerDesktop } from "react-icons/hi2";
 import './PartyPage.css';
 import { socket } from '../socket';
 
@@ -37,8 +37,7 @@ const PartyPage = () => {
             if (roomId === id) {
                 setAdminId(currentAdminId);
                 const formattedMembers: Member[] = initialMembers.map((m: any) => ({
-                    ...m,
-                    icon: m.device_type === 'Laptop' ? laptopIcon : (m.device_type === 'Tablet' ? tabletIcon : mobileIcon)
+                    ...m
                 }));
                 setMembers(formattedMembers);
                 setSongsQueue(initialQueue || []);
@@ -53,18 +52,17 @@ const PartyPage = () => {
         });
 
         //? Listen for new users
-        socket.on("user-joined", (newMember: any) => {
+        socket.on("user-joined", (newMember: Member) => {
             setMembers(prev => {
                 if (prev.some(m => m.id === newMember.id)) return prev;
                 return [...prev, {
-                    ...newMember,
-                    icon: newMember.device_type === 'Laptop' ? laptopIcon : (newMember.device_type === 'Tablet' ? tabletIcon : mobileIcon)
+                    ...newMember
                 }];
             });
         });
 
         //? Listen for users leaving
-        socket.on("user-left", (leftMemberId) => {
+        socket.on("user-left", (leftMemberId: string) => {
             setMembers(prev => prev.filter(m => m.id !== leftMemberId));
         });
 
@@ -110,12 +108,23 @@ const PartyPage = () => {
         socket.emit('update-current-song', { song, roomId: id });
     };
 
+    const DeviceIcon = ({ type, className }: { type: string, className?: string }) => {
+        switch (type) {
+            case 'Mobile':
+                return <HiOutlineDevicePhoneMobile className={className} />;
+            case 'Tablet':
+                return <BsTablet className={className} />;
+            default:
+                return <HiOutlineComputerDesktop className={className} />;
+        }
+    };
+
     return (
         <div className="party-container">
             <div className="ambient-glow glow-top-left"></div>
             <div className="ambient-glow glow-bottom-right"></div>
 
-            <img src={logo} alt="Music.Co" className="logo" onClick={() => navigate('/')} />
+            <img src={logo} alt="Music.Co" className="logo" />
             <header className="party-header">
                 <div className="header-left">
                     <div className="room-info-header" onClick={() => navigate('/upload')}>
@@ -277,13 +286,9 @@ const PartyPage = () => {
                                 </div>
                             </div>
 
-                            <div className="host-icon-wrapper">
-                                <img
-                                    src={
-                                        members.find(m => m.id === adminId)?.device_type === 'Mobile' ? mobileIcon :
-                                            (members.find(m => m.id === adminId)?.device_type === 'Tablet' ? tabletIcon : laptopIcon)
-                                    }
-                                    alt="Host Device"
+                            <div className="host-icon-wrapper react-icon-wrapper">
+                                <DeviceIcon
+                                    type={members.find(m => m.id === adminId)?.device_type || 'Laptop'}
                                     className="host-laptop-icon"
                                 />
                             </div>
@@ -319,7 +324,9 @@ const PartyPage = () => {
                                 {members.filter(m => m.id !== adminId).map((member, index) => (
                                     <div key={member.id} className="member-card">
                                         <span className="member-number">{index + 1}</span>
-                                        <img src={member.icon} alt={member.device_type} className={`member-icon ${member.device_type.toLowerCase()}`} />
+                                        <div className="member-icon-wrapper">
+                                            <DeviceIcon type={member.device_type} className={`member-icon ${member.device_type.toLowerCase()}`} />
+                                        </div>
                                         <div className="member-info">
                                             <span className="member-device-type">{member.device_type}</span>
                                             <span className="member-device-name">{member.device_name}</span>

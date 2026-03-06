@@ -157,6 +157,8 @@
 .host-laptop-icon {
   width: 260px; /* Adjusted to sweet spot */
   height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .host-display-name {
@@ -674,15 +676,15 @@
   width: 48px; /* Adjusted to sweet spot */
   height: auto;
   opacity: 0.9;
-  object-fit: contain;
+  display: block;
 }
 
 .member-icon.mobile {
-  width: 25px; /* Adjusted to sweet spot */
+  width: 35px; /* Adjusted to sweet spot */
 }
 
 .member-icon.tablet {
-  width: 30px; /* Adjusted to sweet spot */
+  width: 35px; /* Adjusted to sweet spot */
 }
 
 .member-info {
@@ -785,11 +787,11 @@
   }
 
   .member-icon.mobile {
-    width: 20px; /* Preserve mobile size */
+    width: 32px; /* Preserve mobile size */
   }
 
   .member-icon.tablet {
-    width: 22px; /* Preserve mobile size */
+    width: 30px; /* Preserve mobile size */
   }
 
   .room-code-section {

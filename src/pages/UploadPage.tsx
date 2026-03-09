@@ -86,7 +86,7 @@ const UploadPage = () => {
                     formData.append("music", file);
                 });
 
-                const response = await fetch("http://localhost:8000/api/v1/music/upload", {
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:8000"}/api/v1/music/upload`, {
                     method: "POST",
                     body: formData,
                 });

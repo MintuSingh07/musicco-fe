@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/musicco_logo.svg';
 import { HiOutlineDevicePhoneMobile } from "react-icons/hi2";
 import { BsTablet } from "react-icons/bs";
-import { HiOutlineComputerDesktop } from "react-icons/hi2";
+import laptopIcon from '../assets/laptop.svg';
+import memberLaptopIcon from '../assets/laptop-2.png';
 import './PartyPage.css';
 import { socket } from '../socket';
 
@@ -21,10 +22,44 @@ const PartyPage = () => {
     const [songsQueue, setSongsQueue] = useState<any[]>([]);
     const [currentSong, setCurrentSong] = useState<any | null>(null);
     const [adminId, setAdminId] = useState<string>('');
-    const [mode, setMode] = useState<'traverse' | 'boom'>('traverse');
+    const [mode, setMode] = useState<'traverse' | 'boom'>('boom');
     const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
     const [copySuccess, setCopySuccess] = useState<boolean>(false);
     const [isMusicPlayerInterface, setIsMusicPlayerInterface] = useState<boolean>(true);
+
+    // Playback State
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [isPlaying, setIsPlaying] = useState<boolean>(false);
+    const [currentTime, setCurrentTime] = useState<number>(0);
+    const [duration, setDuration] = useState<number>(0);
+    // Stores the server playback snapshot received on join, applied once audio loads
+    const pendingPlaybackRef = useRef<any>(null);
+
+    // Lifted to component scope so onLoadedMetadata can also call it
+    const handleSyncPlayback = useCallback((playback: any) => {
+        if (!audioRef.current) return;
+
+        const { isPlaying: serverIsPlaying, currentTime: serverCurrentTime, lastUpdatedAt } = playback;
+
+        // Calculate adjusted time based on network latency
+        const latency = (Date.now() - lastUpdatedAt) / 1000;
+        const targetTime = serverIsPlaying ? serverCurrentTime + latency : serverCurrentTime;
+
+        // Sync play/pause
+        if (serverIsPlaying) {
+            audioRef.current.play().catch(e => console.log("Playback failed:", e));
+            setIsPlaying(true);
+        } else {
+            audioRef.current.pause();
+            setIsPlaying(false);
+        }
+
+        // Sync seek position — always set for new joiners, drift-check for live updates
+        if (Math.abs(audioRef.current.currentTime - targetTime) > 1.5) {
+            audioRef.current.currentTime = targetTime;
+            setCurrentTime(targetTime);
+        }
+    }, []);
 
     useEffect(() => {
         if (!id) return;
@@ -33,7 +68,7 @@ const PartyPage = () => {
         socket.emit('join-room', { roomId: id });
 
         //? Listen for initial room data and join success
-        socket.on("success:join-room", ({ roomId, members: initialMembers, admin: currentAdminId, songsQueue: initialQueue, currentSong: initialSong }) => {
+        socket.on("success:join-room", ({ roomId, members: initialMembers, admin: currentAdminId, songsQueue: initialQueue, currentSong: initialSong, playback: initialPlayback }) => {
             if (roomId === id) {
                 setAdminId(currentAdminId);
                 const formattedMembers: Member[] = initialMembers.map((m: any) => ({
@@ -42,7 +77,17 @@ const PartyPage = () => {
                 setMembers(formattedMembers);
                 setSongsQueue(initialQueue || []);
                 setCurrentSong(initialSong || null);
+
+                // Store playback state — will be applied in onLoadedMetadata once audio is ready
+                if (initialPlayback) {
+                    pendingPlaybackRef.current = initialPlayback;
+                }
             }
+        });
+
+        //? Listen for playback status updates
+        socket.on("playback-status", (playback) => {
+            handleSyncPlayback(playback);
         });
 
         //? Listen for queue updates
@@ -73,6 +118,7 @@ const PartyPage = () => {
 
         return () => {
             socket.off("success:join-room");
+            socket.off("playback-status");
             socket.off("user-joined");
             socket.off("user-left");
             socket.off("error:join-room");
@@ -108,14 +154,54 @@ const PartyPage = () => {
         socket.emit('update-current-song', { song, roomId: id });
     };
 
-    const DeviceIcon = ({ type, className }: { type: string, className?: string }) => {
+    const togglePlay = () => {
+        if (adminId !== socket.id) return;
+
+        if (isPlaying) {
+            socket.emit('pause-song', { roomId: id, currentTime: audioRef.current?.currentTime || 0 });
+        } else {
+            socket.emit('play-song', { roomId: id, currentTime: audioRef.current?.currentTime || 0 });
+        }
+    };
+
+    const handleSeek = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+        if (adminId !== socket.id) return;
+
+        const wrapper = e.currentTarget;
+        const rect = wrapper.getBoundingClientRect();
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const x = clientX - rect.left;
+        const percent = Math.max(0, Math.min(1, x / rect.width));
+        const newTime = percent * duration;
+
+        socket.emit('seek-song', { roomId: id, currentTime: newTime });
+    };
+
+    const onTimeUpdate = () => {
+        if (!audioRef.current) return;
+        setCurrentTime(audioRef.current.currentTime);
+    };
+
+    const onLoadedMetadata = () => {
+        if (!audioRef.current) return;
+        setDuration(audioRef.current.duration);
+
+        // Apply pending playback state from join (fixes race condition for new joiners)
+        if (pendingPlaybackRef.current) {
+            handleSyncPlayback(pendingPlaybackRef.current);
+            pendingPlaybackRef.current = null;
+        }
+    };
+
+    const DeviceIcon = ({ type, className, isHost }: { type: string, className?: string, isHost?: boolean }) => {
         switch (type) {
             case 'Mobile':
                 return <HiOutlineDevicePhoneMobile className={className} />;
             case 'Tablet':
                 return <BsTablet className={className} />;
+            case 'Laptop':
             default:
-                return <HiOutlineComputerDesktop className={className} />;
+                return <img src={isHost ? laptopIcon : memberLaptopIcon} className={className} alt="Laptop" />;
         }
     };
 
@@ -195,7 +281,6 @@ const PartyPage = () => {
                                                     <circle cx="18" cy="16" r="3"></circle>
                                                 </svg>
                                             </div>
-                                            <div className="disc-center"></div>
                                         </div>
                                         <div className="audio-bars">
                                             <div className="bar"></div>
@@ -209,6 +294,58 @@ const PartyPage = () => {
                                         <span className="now-playing-label">Now Playing</span>
                                         <h2 className="now-playing-name">{currentSong.name}</h2>
                                         <p className="now-playing-details">{currentSong.artist || 'Unknown Artist'} • {formatDuration(currentSong.duration)} min</p>
+
+                                        <div className="playback-controls">
+                                            <div className="progress-container">
+                                                <div
+                                                    className="progress-bar-wrapper"
+                                                    onClick={handleSeek}
+                                                >
+                                                    <div
+                                                        className="progress-bar-fill"
+                                                        style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
+                                                    ></div>
+                                                    <div
+                                                        className="progress-bar-handle"
+                                                        style={{ left: `${(currentTime / duration) * 100 || 0}%` }}
+                                                    ></div>
+                                                </div>
+                                                <div className="time-info">
+                                                    <span>{formatDuration(currentTime)}</span>
+                                                    <span>{formatDuration(duration)}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="control-buttons">
+                                                {adminId === socket.id && (
+                                                    <button
+                                                        className="play-pause-btn"
+                                                        onClick={togglePlay}
+                                                    >
+                                                        {isPlaying ? (
+                                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                                <rect x="6" y="4" width="4" height="16"></rect>
+                                                                <rect x="14" y="4" width="4" height="16"></rect>
+                                                            </svg>
+                                                        ) : (
+                                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                                <path d="M8 5v14l11-7z"></path>
+                                                            </svg>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {currentSong.url && (
+                                            <audio
+                                                ref={audioRef}
+                                                src={currentSong.url}
+                                                onTimeUpdate={onTimeUpdate}
+                                                onLoadedMetadata={onLoadedMetadata}
+                                                onEnded={() => setIsPlaying(false)}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </section>
@@ -290,6 +427,7 @@ const PartyPage = () => {
                                 <DeviceIcon
                                     type={members.find(m => m.id === adminId)?.device_type || 'Laptop'}
                                     className="host-laptop-icon"
+                                    isHost={true}
                                 />
                             </div>
 
@@ -301,16 +439,16 @@ const PartyPage = () => {
                                 <div className={`toggle-container ${mode}`}>
                                     <div className="toggle-slider"></div>
                                     <button
-                                        className={`toggle-btn ${mode === 'traverse' ? 'active' : ''}`}
-                                        onClick={() => setMode('traverse')}
-                                    >
-                                        Traverse
-                                    </button>
-                                    <button
                                         className={`toggle-btn ${mode === 'boom' ? 'active' : ''}`}
                                         onClick={() => setMode('boom')}
                                     >
                                         Boom
+                                    </button>
+                                    <button
+                                        className={`toggle-btn ${mode === 'traverse' ? 'active' : ''}`}
+                                        onClick={() => setMode('traverse')}
+                                    >
+                                        Traverse
                                     </button>
                                 </div>
                             </div>
@@ -325,7 +463,7 @@ const PartyPage = () => {
                                     <div key={member.id} className="member-card">
                                         <span className="member-number">{index + 1}</span>
                                         <div className="member-icon-wrapper">
-                                            <DeviceIcon type={member.device_type} className={`member-icon ${member.device_type.toLowerCase()}`} />
+                                            <DeviceIcon type={member.device_type} className={`member-icon ${member.device_type.toLowerCase()}`} isHost={false} />
                                         </div>
                                         <div className="member-info">
                                             <span className="member-device-type">{member.device_type}</span>

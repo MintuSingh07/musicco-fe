@@ -34,6 +34,7 @@ const PartyPage = () => {
     const [duration, setDuration] = useState<number>(0);
     // Stores the server playback snapshot received on join, applied once audio loads
     const pendingPlaybackRef = useRef<any>(null);
+    const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
     // Lifted to component scope so onLoadedMetadata can also call it
     const handleSyncPlayback = useCallback((playback: any) => {
@@ -47,15 +48,25 @@ const PartyPage = () => {
 
         // Sync play/pause
         if (serverIsPlaying) {
-            audioRef.current.play().catch(e => console.log("Playback failed:", e));
-            setIsPlaying(true);
+            audioRef.current.play()
+                .then(() => {
+                    setIsAutoplayBlocked(false);
+                    setIsPlaying(true);
+                })
+                .catch(e => {
+                    console.log("Playback failed (Autoplay likely blocked):", e);
+                    if (e.name === 'NotAllowedError') {
+                        setIsAutoplayBlocked(true);
+                    }
+                    setIsPlaying(false);
+                });
         } else {
             audioRef.current.pause();
             setIsPlaying(false);
         }
 
         // Sync seek position — always set for new joiners, drift-check for live updates
-        if (Math.abs(audioRef.current.currentTime - targetTime) > 1.5) {
+        if (Math.abs(audioRef.current.currentTime - targetTime) > 0.5) {
             audioRef.current.currentTime = targetTime;
             setCurrentTime(targetTime);
         }
@@ -126,6 +137,24 @@ const PartyPage = () => {
         };
     }, [id]);
 
+    // Invisible Auto-Sync: Listen for ANY interaction to resume audio context if blocked
+    useEffect(() => {
+        if (!isAutoplayBlocked) return;
+
+        const handleInteraction = () => {
+            console.log("User interacted, attempting invisible sync...");
+            attemptSync();
+        };
+
+        window.addEventListener('click', handleInteraction);
+        window.addEventListener('touchstart', handleInteraction);
+
+        return () => {
+            window.removeEventListener('click', handleInteraction);
+            window.removeEventListener('touchstart', handleInteraction);
+        };
+    }, [isAutoplayBlocked]);
+
     const handleCopy = () => {
         const url = window.location.href;
         navigator.clipboard.writeText(url).then(() => {
@@ -161,6 +190,20 @@ const PartyPage = () => {
             socket.emit('pause-song', { roomId: id, currentTime: audioRef.current?.currentTime || 0 });
         } else {
             socket.emit('play-song', { roomId: id, currentTime: audioRef.current?.currentTime || 0 });
+        }
+    };
+
+    const attemptSync = () => {
+        if (pendingPlaybackRef.current) {
+            handleSyncPlayback(pendingPlaybackRef.current);
+            pendingPlaybackRef.current = null;
+        } else if (audioRef.current) {
+            audioRef.current.play()
+                .then(() => {
+                    setIsAutoplayBlocked(false);
+                    setIsPlaying(true);
+                })
+                .catch(e => console.error("Auto-sync attempt failed:", e));
         }
     };
 
@@ -271,7 +314,7 @@ const PartyPage = () => {
                     <div className="music-player-container">
                         {currentSong && (
                             <section className="now-playing-section">
-                                <div className="now-playing-card">
+                                <div className={`now-playing-card ${isPlaying ? 'playing' : ''}`}>
                                     <div className="visualizer-container">
                                         <div className="music-disc-container">
                                             <div className="music-disc">

@@ -370,8 +370,13 @@
   justify-content: center;
   color: var(--primary-color);
   animation: rotateDisc 10s linear infinite;
+  animation-play-state: paused;
   position: relative;
   z-index: 1;
+}
+
+.now-playing-card.playing .music-disc {
+  animation-play-state: running;
 }
 
 .music-disc::after {
@@ -411,6 +416,11 @@
   background: var(--primary-color);
   border-radius: 2px;
   animation: audioPulse 1s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.now-playing-card.playing .bar {
+  animation-play-state: running;
 }
 
 .bar:nth-child(2) {
@@ -718,7 +728,7 @@
 
 .host-section,
 .members-section {
-  animation: fadeIn 0.8s ease-out both;
+  animation: fadeIn 0.8s ease-out both paused;
 }
 
 .members-section {
@@ -1094,7 +1104,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding-top: .5rem;
+  padding-top: 0.5rem;
 }
 
 .progress-bar-wrapper {

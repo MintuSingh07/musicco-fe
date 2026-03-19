@@ -728,7 +728,7 @@
 
 .host-section,
 .members-section {
-  animation: fadeIn 0.8s ease-out both paused;
+  animation: fadeIn 0.8s ease-out both;
 }
 
 .members-section {

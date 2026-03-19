@@ -35,42 +35,61 @@ const PartyPage = () => {
     // Stores the server playback snapshot received on join, applied once audio loads
     const pendingPlaybackRef = useRef<any>(null);
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
+    const [clockOffset, setClockOffset] = useState<number>(0);
 
     // Lifted to component scope so onLoadedMetadata can also call it
-    const handleSyncPlayback = useCallback((playback: any) => {
+    const handleSyncPlayback = useCallback((playback: any, currentOffset = clockOffset) => {
         if (!audioRef.current) return;
 
-        const { isPlaying: serverIsPlaying, currentTime: serverCurrentTime, lastUpdatedAt } = playback;
+        const { isPlaying: serverIsPlaying, currentTime: serverCurrentTime, startAt } = playback;
 
-        // Calculate adjusted time based on network latency
-        const latency = (Date.now() - lastUpdatedAt) / 1000;
-        const targetTime = serverIsPlaying ? serverCurrentTime + latency : serverCurrentTime;
-
-        // Sync play/pause
         if (serverIsPlaying) {
-            audioRef.current.play()
-                .then(() => {
+            // Calculate delay based on precise server time
+            const serverNow = Date.now() + currentOffset;
+            const delay = startAt ? startAt - serverNow : 0;
+            const targetTime = delay > 0 ? serverCurrentTime : serverCurrentTime + (Math.abs(delay) / 1000);
+
+            // Sync seek position
+            if (Math.abs(audioRef.current.currentTime - targetTime) > 0.5) {
+                audioRef.current.currentTime = targetTime;
+                setCurrentTime(targetTime);
+            }
+
+            if (delay > 0) {
+                // Schedule playback in the future
+                setTimeout(() => {
+                    if (audioRef.current) {
+                        audioRef.current.play().then(() => {
+                            setIsAutoplayBlocked(false);
+                            setIsPlaying(true);
+                        }).catch(e => {
+                            console.log("Playback failed (Autoplay likely blocked):", e);
+                            if (e.name === 'NotAllowedError') setIsAutoplayBlocked(true);
+                            setIsPlaying(false);
+                        });
+                    }
+                }, delay);
+            } else {
+                // Play immediately if startAt has passed
+                audioRef.current.play().then(() => {
                     setIsAutoplayBlocked(false);
                     setIsPlaying(true);
-                })
-                .catch(e => {
+                }).catch(e => {
                     console.log("Playback failed (Autoplay likely blocked):", e);
-                    if (e.name === 'NotAllowedError') {
-                        setIsAutoplayBlocked(true);
-                    }
+                    if (e.name === 'NotAllowedError') setIsAutoplayBlocked(true);
                     setIsPlaying(false);
                 });
+            }
         } else {
+            // Pause
             audioRef.current.pause();
             setIsPlaying(false);
+            if (Math.abs(audioRef.current.currentTime - serverCurrentTime) > 0.5) {
+                audioRef.current.currentTime = serverCurrentTime;
+                setCurrentTime(serverCurrentTime);
+            }
         }
-
-        // Sync seek position — always set for new joiners, drift-check for live updates
-        if (Math.abs(audioRef.current.currentTime - targetTime) > 0.5) {
-            audioRef.current.currentTime = targetTime;
-            setCurrentTime(targetTime);
-        }
-    }, []);
+    }, [clockOffset]);
 
     useEffect(() => {
         if (!id) return;
@@ -101,6 +120,17 @@ const PartyPage = () => {
             handleSyncPlayback(playback);
         });
 
+        //? Listen for continuous sync from server for drift correction
+        socket.on("sync", ({ position }) => {
+            if (!audioRef.current || !isPlaying) return;
+            // "if difference > 50ms -> adjust playback"
+            if (Math.abs(audioRef.current.currentTime - position) > 0.05) {
+                console.log(`Drift corrected: ${audioRef.current.currentTime} -> ${position}`);
+                audioRef.current.currentTime = position;
+                setCurrentTime(position);
+            }
+        });
+
         //? Listen for queue updates
         socket.on("queue-updated", ({ queue, currentSong: updatedSong }) => {
             setSongsQueue(queue);
@@ -127,15 +157,30 @@ const PartyPage = () => {
             // If room doesn't exist, we might want to redirect
         });
 
+        //? Clock Sync
+        const measureLatency = () => {
+            const start = Date.now();
+            socket.emit("ping");
+            socket.once("pong", (serverTime: number) => {
+                const latency = (Date.now() - start) / 2;
+                const offset = serverTime + latency - Date.now();
+                setClockOffset(offset);
+            });
+        };
+        measureLatency();
+        const pingInterval = setInterval(measureLatency, 5000); // Check latency every 5 seconds
+
         return () => {
             socket.off("success:join-room");
             socket.off("playback-status");
+            socket.off("sync");
             socket.off("user-joined");
             socket.off("user-left");
             socket.off("error:join-room");
             socket.off("queue-updated");
+            clearInterval(pingInterval);
         };
-    }, [id]);
+    }, [id, clockOffset, isPlaying, handleSyncPlayback]);
 
     // Invisible Auto-Sync: Listen for ANY interaction to resume audio context if blocked
     useEffect(() => {

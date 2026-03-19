@@ -38,58 +38,48 @@ const PartyPage = () => {
     const [clockOffset, setClockOffset] = useState<number>(0);
 
     // Lifted to component scope so onLoadedMetadata can also call it
-    const handleSyncPlayback = useCallback((playback: any, currentOffset = clockOffset) => {
-        if (!audioRef.current) return;
+    const handleSyncPlayback = useCallback((playback: any) => {
+        const audio = audioRef.current;
 
-        const { isPlaying: serverIsPlaying, currentTime: serverCurrentTime, startAt } = playback;
+        if (!audio || !audio.src) {
+            pendingPlaybackRef.current = playback;
+            return;
+        }
+
+        const { isPlaying: serverIsPlaying, currentTime, startAt } = playback;
+
+        const now = Date.now();
+        const delay = startAt ? startAt - now : 0;
+
+        let targetTime = currentTime;
+
+        if (delay < 0) {
+            targetTime = currentTime + Math.abs(delay) / 1000;
+        }
+
+        // ✅ only seek if needed
+        if (Math.abs(audio.currentTime - targetTime) > 0.5) {
+            audio.currentTime = targetTime;
+        }
 
         if (serverIsPlaying) {
-            // Calculate delay based on precise server time
-            const serverNow = Date.now() + currentOffset;
-            const delay = startAt ? startAt - serverNow : 0;
-            const targetTime = delay > 0 ? serverCurrentTime : serverCurrentTime + (Math.abs(delay) / 1000);
-
-            // Sync seek position
-            if (Math.abs(audioRef.current.currentTime - targetTime) > 0.5) {
-                audioRef.current.currentTime = targetTime;
-                setCurrentTime(targetTime);
-            }
-
-            if (delay > 0) {
-                // Schedule playback in the future
-                setTimeout(() => {
-                    if (audioRef.current) {
-                        audioRef.current.play().then(() => {
-                            setIsAutoplayBlocked(false);
+            setTimeout(() => {
+                if (audio.paused) {
+                    audio.play()
+                        .then(() => {
                             setIsPlaying(true);
-                        }).catch(e => {
-                            console.log("Playback failed (Autoplay likely blocked):", e);
-                            if (e.name === 'NotAllowedError') setIsAutoplayBlocked(true);
-                            setIsPlaying(false);
+                            setIsAutoplayBlocked(false);
+                        })
+                        .catch(() => {
+                            setIsAutoplayBlocked(true);
                         });
-                    }
-                }, delay);
-            } else {
-                // Play immediately if startAt has passed
-                audioRef.current.play().then(() => {
-                    setIsAutoplayBlocked(false);
-                    setIsPlaying(true);
-                }).catch(e => {
-                    console.log("Playback failed (Autoplay likely blocked):", e);
-                    if (e.name === 'NotAllowedError') setIsAutoplayBlocked(true);
-                    setIsPlaying(false);
-                });
-            }
+                }
+            }, Math.max(0, delay));
         } else {
-            // Pause
-            audioRef.current.pause();
+            audio.pause();
             setIsPlaying(false);
-            if (Math.abs(audioRef.current.currentTime - serverCurrentTime) > 0.5) {
-                audioRef.current.currentTime = serverCurrentTime;
-                setCurrentTime(serverCurrentTime);
-            }
         }
-    }, [clockOffset]);
+    }, []);
 
     useEffect(() => {
         if (!id) return;
@@ -122,13 +112,16 @@ const PartyPage = () => {
 
         //? Listen for continuous sync from server for drift correction
         socket.on("sync", ({ position }) => {
-            if (!audioRef.current || !isPlaying) return;
-            // "if difference > 50ms -> adjust playback"
-            if (Math.abs(audioRef.current.currentTime - position) > 0.05) {
-                console.log(`Drift corrected: ${audioRef.current.currentTime} -> ${position}`);
-                audioRef.current.currentTime = position;
-                setCurrentTime(position);
-            }
+            const audio = audioRef.current;
+            if (!audio || !isPlaying) return;
+
+            const diff = position - audio.currentTime;
+
+            // ✅ ignore small diff (NO crack sound)
+            if (Math.abs(diff) < 0.3) return;
+
+            // ✅ only fix big drift
+            audio.currentTime = position;
         });
 
         //? Listen for queue updates
@@ -158,12 +151,22 @@ const PartyPage = () => {
         });
 
         //? Clock Sync
+        const latencies: number[] = [];
+
         const measureLatency = () => {
             const start = Date.now();
             socket.emit("ping");
+
             socket.once("pong", (serverTime: number) => {
                 const latency = (Date.now() - start) / 2;
-                const offset = serverTime + latency - Date.now();
+
+                latencies.push(latency);
+                if (latencies.length > 5) latencies.shift();
+
+                const avgLatency =
+                    latencies.reduce((a, b) => a + b, 0) / latencies.length;
+
+                const offset = serverTime + avgLatency - Date.now();
                 setClockOffset(offset);
             });
         };
@@ -181,6 +184,30 @@ const PartyPage = () => {
             clearInterval(pingInterval);
         };
     }, [id, clockOffset, isPlaying, handleSyncPlayback]);
+
+    useEffect(() => {
+        const unlockAudio = () => {
+            const audio = audioRef.current;
+
+            if (!audio) return;
+
+            audio.play()
+                .then(() => {
+                    audio.pause();
+                    setIsAutoplayBlocked(false);
+                    console.log("Audio unlocked 🔓");
+                })
+                .catch(() => { });
+        };
+
+        window.addEventListener("click", unlockAudio);
+        window.addEventListener("touchstart", unlockAudio);
+
+        return () => {
+            window.removeEventListener("click", unlockAudio);
+            window.removeEventListener("touchstart", unlockAudio);
+        };
+    }, []);
 
     // Invisible Auto-Sync: Listen for ANY interaction to resume audio context if blocked
     useEffect(() => {
